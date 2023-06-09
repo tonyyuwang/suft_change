@@ -8,6 +8,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1, 3"  # on
 
 # 添加了注释
 
+# 测试新的
+
 from pathlib import Path
 
 import torch.cuda

@@ -10,6 +10,13 @@
             </list>
           </settings>
         </remote-mappings>
+        <remote-mappings server-id="python@sftp://WANGYu_2020@115.156.156.197:2084/home/WANGYu_2020/miniconda3/envs/ct2/bin/python3.6">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/WANGYu_2020/code/swinunetcorrect_change" />
+            </list>
+          </settings>
+        </remote-mappings>
       </list>
     </list>
   </component>
