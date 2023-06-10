@@ -2,8 +2,8 @@
 <project version="4">
   <component name="WebServers">
     <option name="servers">
-      <webServer id="4f027cda-6af5-4365-a306-33d455421704" name="suft_change">
-        <fileTransfer rootFolder="/home/WANGYu_2020" accessType="SFTP" host="115.156.156.197" port="2084" sshConfigId="e329624b-7afa-40d3-a3a0-8dc7a0bdef9b" sshConfig="WANGYu_2020@115.156.156.197:2084 password">
+      <webServer id="8912dbac-6762-4a89-ae42-c0c75f641461" name="suft_change">
+        <fileTransfer rootFolder="/home/WANGYu_2020" accessType="SFTP" host="115.156.156.197" port="2084" sshConfigId="b3d688b9-aaf1-449a-88a4-ae8881212329" sshConfig="WANGYu_2020@115.156.156.197:2084 password">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
           </advancedOptions>
