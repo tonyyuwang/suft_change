@@ -906,33 +906,35 @@ class SwinTransformerSys(nn.Module):
         self.cls = cls
         self.cielab = CIELAB()
         self.q_to_ab = self.cielab.q_to_ab
-        self.cls_emb = nn.Parameter(torch.randn(1, cls, 4*embed_dim))  # [1, 313, dim]
-        self.pos_color = PosCNN(4*embed_dim, 4*embed_dim, self.q_to_ab)
-        self.pos_patch = PosCNN(4*embed_dim, 4*embed_dim)
+        self.color_embed_dim = 6*embed_dim
+        self.cls_emb = nn.Parameter(torch.randn(1, cls, self.color_embed_dim))  # [1, 313, dim]
+        self.pos_color = PosCNN(self.color_embed_dim, self.color_embed_dim, self.q_to_ab)
+        self.pos_patch = PosCNN(self.color_embed_dim, self.color_embed_dim)
 
-        self.per_block = nn.ModuleList(
-            [Decoder_Block(d_model, n_heads, d_ff, dropout, dpr[i]) for i in range(2)]  # 2
-        )
 
-        self.per_block = nn.ModuleList()
-        for i in range(2):
-            if i == 0:
-                self.per_block = Decoder_Block()
+        # self.per_block = nn.ModuleList(
+        #     [Decoder_Block(d_model, d_model//64, d_model*4, drop_path_rate, dpr[i]) for i in range(2)]  # 2
+        # )
 
-        self.blocks = nn.ModuleList([self.per_block for i in range(3)])  # 3个decoder blocks, 每个block计算两次attention
+        d_model = [6*embed_dim, 4*embed_dim, 3*embed_dim]
+        self.blocks = nn.ModuleList()
+        for i in range(3):
+            per_blocks = nn.ModuleList()
+            for i_block in range(2):
+                per_blocks.append(Decoder_Block(d_model[i], d_model[i]//64, d_model[i]*4, 0, dpr[i]))
+            blocks = nn.Module()
+            blocks.per_blocks = per_blocks
+            self.blocks.append(blocks)
 
-        self.attn_4C = Decoder_Attention(embed_dim*4, 8, 0.1)
-        self.attn_2C = Decoder_Attention(embed_dim*6, 8, 0.1)
-        self.attn_C = Decoder_Attention(embed_dim*7, 8, 0.1)
+        self.concat_down_4C = nn.Linear(4*embed_dim, 2*embed_dim)
+        self.concat_down_2C = nn.Linear(2*embed_dim, embed_dim)
+        self.concat_down_C = nn.Linear(embed_dim, embed_dim)
 
-        self.expand_4C = SkipPatchExpand(input_resolution=(16, 16), dim=4*embed_dim, dim_scale=2, norm_layer=norm_layer)
-        self.color_expand_4C = nn.Linear(4*embed_dim, 6*embed_dim)
+        self.expand_4C = SkipPatchExpand(input_resolution=(16, 16), dim=6*embed_dim, dim_scale=2, norm_layer=norm_layer)
+        self.color_expand_4C = nn.Linear(6*embed_dim, 4*embed_dim)
 
-        self.expand_2C = SkipPatchExpand(input_resolution=(32, 32), dim=6*embed_dim, dim_scale=2, norm_layer=norm_layer)
-        self.color_expand_2C = nn.Linear(6 * embed_dim, 7*embed_dim)
-
-        self.expand_C = SkipPatchExpand(input_resolution=(64, 64), dim=embed_dim, dim_scale=2, norm_layer=norm_layer)
-        self.color_expand_C = nn.Linear(7*embed_dim, 7*embed_dim)
+        self.expand_2C = SkipPatchExpand(input_resolution=(32, 32), dim=4*embed_dim, dim_scale=2, norm_layer=norm_layer)
+        self.color_expand_2C = nn.Linear(4 * embed_dim, 3*embed_dim)
 
         self.proj_patch_other = nn.Parameter(self.scale * torch.randn(embed_dim*4, embed_dim*4))
         self.proj_classes_other = nn.Parameter(self.scale * torch.randn(embed_dim*4, embed_dim*4))
@@ -1019,8 +1021,8 @@ class SwinTransformerSys(nn.Module):
 
         self.tanh = nn.Tanh()
 
-        self.conv_layers = nn.Conv2d(7*embed_dim, 7*embed_dim, kernel_size=3, stride=1, padding=1)
-        self.color_linear = nn.Linear(7*embed_dim, 7*embed_dim)
+        self.conv_layers = nn.Conv2d(3*embed_dim, 3*embed_dim, kernel_size=3, stride=1, padding=1)
+        self.color_linear = nn.Linear(3*embed_dim, 3*embed_dim)
 
 
 
@@ -1049,7 +1051,7 @@ class SwinTransformerSys(nn.Module):
 
 
         self.norm = norm_layer(self.num_features)
-        self.norm_up= norm_layer(7*self.embed_dim)
+        self.norm_up= norm_layer(3*self.embed_dim)
 
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
@@ -1058,10 +1060,10 @@ class SwinTransformerSys(nn.Module):
 
         self.apply(self._init_weights)
         self.up_final = nn.Sequential(
-            conv3x3_bn_relu(7*embed_dim, 7*embed_dim),
-            nn.ConvTranspose2d(7*embed_dim, 7*embed_dim, kernel_size=4, stride=2, padding=1, bias=True),
-            conv3x3_bn_relu(7*embed_dim, 7*embed_dim),
-            nn.ConvTranspose2d(7*embed_dim, 7*embed_dim, kernel_size=4, stride=2, padding=1, bias=True),
+            conv3x3_bn_relu(3*embed_dim, 3*embed_dim),
+            nn.ConvTranspose2d(3*embed_dim, 3*embed_dim, kernel_size=4, stride=2, padding=1, bias=True),
+            conv3x3_bn_relu(3*embed_dim, 3*embed_dim),
+            nn.ConvTranspose2d(3*embed_dim, 3*embed_dim, kernel_size=4, stride=2, padding=1, bias=True),
         )
 
     def _init_weights(self, m):
@@ -1099,6 +1101,11 @@ class SwinTransformerSys(nn.Module):
 
     #Dencoder and Skip connection
     def forward_up_features(self, x, x_downsample, input_mask):
+        # 计算三层color attention用到的mask
+        process_mask = self.calculate_mask(input_mask)
+        process_mask_32 = self.calculate_mask_32(input_mask)
+        process_mask_64 = self.calculate_mask_64(input_mask)
+
         for inx in range(4):
             if inx == 0:
                 # patch expand
@@ -1106,11 +1113,10 @@ class SwinTransformerSys(nn.Module):
             if inx == 1:
                 # concat forward_down_features
 
-                x = torch.cat([x, x_downsample[3 - inx]], -1)  # on
+                x = torch.cat([x, self.concat_down_4C(x_downsample[3 - inx])], -1)  # on 6C
 
                 # linear
-
-                x = self.concat_linear_4C_x(x)  # on
+                # x = self.concat_linear_4C_x(x)  # on
 
                 # x = self.concat_back_dim[inx](x)  # 8C
                 # h/16 加入color tokens [B, N+313, 4C]
@@ -1119,60 +1125,52 @@ class SwinTransformerSys(nn.Module):
                 cls_emb = self.pos_color(cls_emb, pos_h, pos_w)  # cpvt for color tokens.
                 GS = int(math.sqrt(x.size(1)))  # 16
                 x = self.pos_patch(x, GS, GS)  # cpvt for patch tokens.
-                x = torch.cat((x, cls_emb), 1)  # B, 16*16+313, 4C
-
-                process_mask = self.calculate_mask(input_mask)
-                process_mask_32 = self.calculate_mask_32(input_mask)
-                process_mask_64 = self.calculate_mask_64(input_mask)
+                x = torch.cat((x, cls_emb), 1)  # B, 16*16+313, 6C
 
                 # color transformer 计算attn
                 # print(x.shape)  # [B, 16*16+313, 768]
-                y, attn = self.attn_4C(self.norm1_4C(x), process_mask, without_colorattn=False)  # y[B, 16*16+313, 4C]
-                # y, attn = self.attn_4C(self.norm1_4C(x), mask=None, without_colorattn=False)
-                x = x + self.drop_path_4C(y)
-                x = x + self.drop_path_4C(self.mlp_4C(self.norm2_4C(x)))
+                for i_block in range(2):
+                    x = self.blocks[inx-1].per_blocks[i_block](x, mask=process_mask, without_colorattn=False)
 
                 # split x, c_token
                 x, color_token = x[:, :-self.cls, :], x[:, -self.cls:, :]
 
                 # skip expand
-                x = self.expand_4C(x)  # [B, 16*16, 4C] -> [B, 32*32, 4C]
-                color_token = self.color_expand_4C(color_token)  # [4C] -> [6C]
+                x = self.expand_4C(x)  # [B, 16*16, 6C] -> [B, 32*32, 3C]
+                color_token = self.color_expand_4C(color_token)  # [6C] -> [4C]
 
             if inx == 2:
                 # concat forward_down_features
-                x = torch.cat([x, x_downsample[3 - inx]], -1)  # on
+                x = torch.cat([x, self.concat_down_2C(x_downsample[3 - inx])], -1)  # on 4C
                 # linear
                 # x = self.concat_linear_2C(x)  # on
                 # x = self.concat_back_dim[inx](x)
                 # h/8 concat color tokens
                 x = torch.cat((x, color_token), 1)
                 # attn
-                y, attn = self.attn_2C(self.norm1_2C(x), mask=process_mask_32, without_colorattn=False)
-                x = x + self.drop_path_2C(y)
-                x = x + self.drop_path_2C(self.mlp_2C(self.norm2_2C(x)))
+                for i_block in range(2):
+                    x = self.blocks[inx - 1].per_blocks[i_block](x, mask=process_mask_32, without_colorattn=False)
                 # split x, c_token
                 x, color_token = x[:, :-self.cls, :], x[:, -self.cls:, :]
                 # expand
-                x = self.expand_2C(x)  # [B, 32, 32, 6C] -> [B, 64, 64, 6C]
-                color_token = self.color_expand_2C(color_token)  # [6C] -> [7C]
+                x = self.expand_2C(x)  # [B, 32, 32, 4C] -> [B, 64, 64, 2C]
+                color_token = self.color_expand_2C(color_token)  # [4C] -> [3C]
 
             if inx == 3:
                 # concat forward_down_features
 
-                x = torch.cat([x, x_downsample[3 - inx]], -1)  # on
+                x = torch.cat([x, self.concat_down_C(x_downsample[3 - inx])], -1)  # on 3C
 
                 # linear
                 # x = self.concat_linear_C(x)  # on
                 # h/4 concat color tokens
-                x = torch.cat((x, color_token), 1)
-                # attn
-                y, attn = self.attn_C(self.norm1_C(x), mask=process_mask_64, without_colorattn=False)
-                x = x + self.drop_path_C(y)
-                x = x + self.drop_path_C(self.mlp_C(self.norm2_C(x)))
+                x = torch.cat((x, color_token), 1)  # 3C
+                # attn*2
+                for i_block in range(2):
+                    x = self.blocks[inx - 1].per_blocks[i_block](x, mask=process_mask_64, without_colorattn=False)
                 # split x, c_token
                 x, color_token = x[:, :-self.cls, :], x[:, -self.cls:, :]
-                patches_64 = x  # [B, 64, 64, 7*C]
+                patches_64 = x  # [B, 64, 64, 3*C]
                 # expand [B, h, w, C] [B, 313, C]
                 # patches = self.expand_C(x)  # [B, h/4, w/4, C]  [B, 64, 64, C]
                 # color_token = self.color_expand_C(color_token)  # [B, 313, C]
@@ -1183,11 +1181,11 @@ class SwinTransformerSys(nn.Module):
             #     x = self.concat_back_dim[inx](x)
             #     x = layer_up(x)
 
-        # x = self.norm_up(x)  # B L C
+        # x = self.norm_up(x)  # B L 3C
         B, _, C = x.shape
         # patch, color = x[:, :-313], x[:, -313:]
         patch_h = patch_w = int(math.sqrt(x.size(1)))  # 64
-        patch = x.contiguous().view(B, patch_h, patch_w, C).permute(0, 3, 1, 2)  # [B, 7*192, h, w]
+        patch = x.contiguous().view(B, patch_h, patch_w, C).permute(0, 3, 1, 2)  # [B, 3*192, h, w]
         patch = self.conv_layers(patch).contiguous()  # conv after per transformer block for patch.
         color = self.color_linear(color_token)  # linear after per transformer blocks for color.
         patch = patch.view(B, C, patch_h * patch_w).transpose(1, 2)
@@ -1204,8 +1202,8 @@ class SwinTransformerSys(nn.Module):
         assert L == H*W, "input features has wrong size"
 
         if self.final_upsample=="expand_first":
-            x = x.contiguous().view(B, H, W, 7*self.embed_dim).permute(0, 3, 1, 2)
-            x = self.up_final(x)  # B,C,256,256
+            x = x.contiguous().view(B, H, W, 3*self.embed_dim).permute(0, 3, 1, 2)
+            x = self.up_final(x)  # B,3C,256,256
 
             # x = self.up(x)  # 这个需要加吗
 
@@ -1223,7 +1221,7 @@ class SwinTransformerSys(nn.Module):
 
         x = self.up_x4(x)  # [B, 64*64, C]->[B, C, 256, 256]
         B, C, H_x, W_x = x.shape
-        x = x.view(B, 7*self.embed_dim, H_x * W_x).transpose(1, 2).contiguous()  # [B, 256*256, C]
+        x = x.view(B, 3*self.embed_dim, H_x * W_x).transpose(1, 2).contiguous()  # [B, 256*256, 3C]
         patches = x
         # print("x.shape",x.shape)
 
