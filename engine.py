@@ -203,7 +203,7 @@ def train_one_epoch(
             if loss_scaler is not None:
                 snapshot["loss_scaler"] = loss_scaler.state_dict()
             snapshot["epoch"] = epoch
-            save_path = os.path.join(log_dir, 'second_checkpoint_epoch_%d_iter_%d.pth' % (epoch, num_updates))
+            save_path = os.path.join(log_dir, 'first_checkpoint_epoch_%d_iter_%d.pth' % (epoch, num_updates))
             torch.save(snapshot, save_path)
             print('save model into:', save_path)
 

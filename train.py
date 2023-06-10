@@ -2,7 +2,7 @@ import sys
 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1, 3"  # on
+os.environ["CUDA_VISIBLE_DEVICES"] = "6, 7"  # on
 
 # 加了一行文字 test2
 

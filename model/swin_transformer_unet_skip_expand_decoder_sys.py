@@ -465,8 +465,7 @@ class SkipPatchExpand(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.expand = nn.Linear(dim, 4*dim, bias=False) if dim_scale==2 else nn.Identity()
-        self.linear = nn.Linear(dim, dim//2)
+        self.expand = nn.Linear(dim, 2*dim, bias=False) if dim_scale==2 else nn.Identity()
         self.norm = norm_layer(dim)
 
     def forward(self, x):
@@ -475,13 +474,13 @@ class SkipPatchExpand(nn.Module):
         """
         H, W = self.input_resolution
         # x_linear = self.linear(x)
-        x = self.expand(x)  # B, L, C  4*C_ori
+        x = self.expand(x)  # B, L, C  2*C_ori
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
 
         x = x.view(B, H, W, C)
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=2, p2=2, c=C//4)
-        x = x.view(B,-1,C//4)  # B, 2*H*2*W, C_ori
+        x = x.view(B,-1,C//4)  # B, 2*H*2*W, C_ori/2
         x = x+self.norm(x)
 
         return x
