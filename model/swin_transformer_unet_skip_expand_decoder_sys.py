@@ -466,7 +466,7 @@ class SkipPatchExpand(nn.Module):
         self.input_resolution = input_resolution
         self.dim = dim
         self.expand = nn.Linear(dim, 2*dim, bias=False) if dim_scale==2 else nn.Identity()
-        self.norm = norm_layer(dim)
+        self.norm = norm_layer(dim//2)
 
     def forward(self, x):
         """
@@ -481,7 +481,7 @@ class SkipPatchExpand(nn.Module):
         x = x.view(B, H, W, C)
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=2, p2=2, c=C//4)
         x = x.view(B,-1,C//4)  # B, 2*H*2*W, C_ori/2
-        x = x+self.norm(x)
+        x = self.norm(x)
 
         return x
 
@@ -938,8 +938,8 @@ class SwinTransformerSys(nn.Module):
         self.proj_patch_other = nn.Parameter(self.scale * torch.randn(embed_dim*4, embed_dim*4))
         self.proj_classes_other = nn.Parameter(self.scale * torch.randn(embed_dim*4, embed_dim*4))
 
-        self.proj_patch = nn.Parameter(self.scale * torch.randn(7*embed_dim, 7*embed_dim))
-        self.proj_classes = nn.Parameter(self.scale * torch.randn(7*embed_dim, 7*embed_dim))
+        self.proj_patch = nn.Parameter(self.scale * torch.randn(3*embed_dim, 3*embed_dim))
+        self.proj_classes = nn.Parameter(self.scale * torch.randn(3*embed_dim, 3*embed_dim))
         self.mask_norm = nn.LayerNorm(self.cls)
 
         self.default_cielab = CIELAB()
@@ -1046,7 +1046,7 @@ class SwinTransformerSys(nn.Module):
             self.layers.append(layer)
         
         # build decoder layers
-        self.layer_up_0 = PatchExpand(input_resolution=patches_resolution[0] // 8)
+        self.layer_up_0 = PatchExpand(input_resolution=(8, 8), dim=8*embed_dim, dim_scale=2, norm_layer=norm_layer)
 
 
         self.norm = norm_layer(self.num_features)
@@ -1213,7 +1213,7 @@ class SwinTransformerSys(nn.Module):
     def forward(self, x, img_size, gt_ab, input_mask=None):
         H, W = img_size
         x, x_downsample = self.forward_features(x)
-        down_features = self.layers_up[0](x)  # [B, 16*16, 4*C]
+        down_features = self.layer_up_0(x)  # [B, 16*16, 4*C]
 
 
         x, color_token, patches_64 = self.forward_up_features(x,x_downsample, input_mask)

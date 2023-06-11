@@ -70,7 +70,7 @@ import collections
 @click.option("--eval-freq", default=None, type=int)
 @click.option("--amp/--no-amp", default=False, is_flag=True)
 
-@click.option("--resume/--no-resume", default=True, is_flag=True)
+@click.option("--resume/--no-resume", default=False, is_flag=True)
 
 
 @click.option('--local_rank', type=int, default=3)
