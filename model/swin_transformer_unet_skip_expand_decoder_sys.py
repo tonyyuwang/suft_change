@@ -1115,9 +1115,6 @@ class SwinTransformerSys(nn.Module):
                 x = torch.cat([x, self.concat_down_4C(x_downsample[3 - inx])], -1)  # on 6C
 
                 # linear
-                # x = self.concat_linear_4C_x(x)  # on
-
-                # x = self.concat_back_dim[inx](x)  # 8C
                 # h/16 加入color tokens [B, N+313, 4C]
                 pos_h, pos_w = 23, 23
                 cls_emb = self.cls_emb.expand(x.size(0), -1, -1)  # B, 313, C
@@ -1142,8 +1139,7 @@ class SwinTransformerSys(nn.Module):
                 # concat forward_down_features
                 x = torch.cat([x, self.concat_down_2C(x_downsample[3 - inx])], -1)  # on 4C
                 # linear
-                # x = self.concat_linear_2C(x)  # on
-                # x = self.concat_back_dim[inx](x)
+
                 # h/8 concat color tokens
                 x = torch.cat((x, color_token), 1)
                 # attn
@@ -1161,7 +1157,6 @@ class SwinTransformerSys(nn.Module):
                 x = torch.cat([x, self.concat_down_C(x_downsample[3 - inx])], -1)  # on 3C
 
                 # linear
-                # x = self.concat_linear_C(x)  # on
                 # h/4 concat color tokens
                 x = torch.cat((x, color_token), 1)  # 3C
                 # attn*2
@@ -1171,18 +1166,8 @@ class SwinTransformerSys(nn.Module):
                 x, color_token = x[:, :-self.cls, :], x[:, -self.cls:, :]
                 patches_64 = x  # [B, 64, 64, 3*C]
                 # expand [B, h, w, C] [B, 313, C]
-                # patches = self.expand_C(x)  # [B, h/4, w/4, C]  [B, 64, 64, C]
-                # color_token = self.color_expand_C(color_token)  # [B, 313, C]
 
-
-            # else: #
-            #     x = torch.cat([patches,x_downsample[3-inx]],-1)
-            #     x = self.concat_back_dim[inx](x)
-            #     x = layer_up(x)
-
-        # x = self.norm_up(x)  # B L 3C
         B, _, C = x.shape
-        # patch, color = x[:, :-313], x[:, -313:]
         patch_h = patch_w = int(math.sqrt(x.size(1)))  # 64
         patch = x.contiguous().view(B, patch_h, patch_w, C).permute(0, 3, 1, 2)  # [B, 3*192, h, w]
         patch = self.conv_layers(patch).contiguous()  # conv after per transformer block for patch.
@@ -1239,12 +1224,6 @@ class SwinTransformerSys(nn.Module):
 
         masks = rearrange(masks, "b (h w) n -> b n h w", h=H)  # [B, 313, 256, 256]
 
-        # regression
-        # if self.with_regression:
-            # print("regression:true")
-
-
-
         q_pred = masks  # multi-scaled, [B, 313, 256, 256]
         # print("q_pred:", q_pred)
         q_actual = self.encode_ab(gt_ab)
@@ -1269,13 +1248,13 @@ class SwinTransformerSys(nn.Module):
     def inference(self, x, img_size, gt_ab, input_mask=None):
         H, W = img_size
         x, x_downsample = self.forward_features(x)
-        down_features = self.layers_up[0](x)  # [B, 16*16, 4*C]
+        down_features = self.layer_up_0(x)  # [B, 16*16, 4*C]
 
         x, color_token, patches_64 = self.forward_up_features(x, x_downsample, input_mask)
 
         x = self.up_x4(x)  # [B, 64*64, C]->[B, C, 256, 256]
         B, C, H_x, W_x = x.shape
-        x = x.view(B, 7 * self.embed_dim, H_x * W_x).transpose(1, 2).contiguous()  # [B, 256*256, C]
+        x = x.view(B, 3 * self.embed_dim, H_x * W_x).transpose(1, 2).contiguous()  # [B, 256*256, 3C]
         patches = x
         # print("x.shape",x.shape)
 
@@ -1294,9 +1273,6 @@ class SwinTransformerSys(nn.Module):
 
         masks = rearrange(masks, "b (h w) n -> b n h w", h=H)  # [B, 313, 256, 256]
 
-        # regression
-        # if self.with_regression:
-        # print("regression:true")
 
         q_pred = masks  # multi-scaled, [B, 313, 256, 256]
         # print("q_pred:", q_pred)
@@ -1316,10 +1292,7 @@ class SwinTransformerSys(nn.Module):
         out_features = self.upsampler_l1(out_features)
         out_features = self.tanh(out_features)
 
-        if self.with_regression:
-            return ab_pred, q_pred, q_actual, out_features
-        else:
-            return ab_pred, q_pred, q_actual, out_features
+        return ab_pred, q_pred, q_actual, out_features
 
     def flops(self):
         flops = 0

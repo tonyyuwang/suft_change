@@ -70,7 +70,7 @@ import collections
 @click.option("--eval-freq", default=None, type=int)
 @click.option("--amp/--no-amp", default=False, is_flag=True)
 
-@click.option("--resume/--no-resume", default=False, is_flag=True)
+@click.option("--resume/--no-resume", default=True, is_flag=True)
 
 
 @click.option('--local_rank', type=int, default=3)
@@ -282,7 +282,7 @@ def main(
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoint_path = log_dir / 'third_checkpoint_epoch_1_iter_205000.pth'  # tiny.
+    checkpoint_path = log_dir / 'second_checkpoint_epoch_0_iter_45000.pth'  # tiny.
 
     # dataset
     dataset_kwargs = variant["dataset_kwargs"]

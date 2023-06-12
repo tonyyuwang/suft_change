@@ -43,7 +43,7 @@ import collections
 
 
 @click.command(help="")
-@click.option("--log-dir", type=str, help="logging directory", default="logs/with_correct")
+@click.option("--log-dir", type=str, help="logging directory", default="logs/without_correct")
 @click.option("--dataset", default='coco', type=str)
 @click.option('--dataset_dir', default='/data/wy/ImageNet',type=str)
 @click.option("--im-size", default=256, type=int, help="dataset resize size")
@@ -102,7 +102,7 @@ import collections
 @click.option('--color_token_num', type=int, default=313)
 @click.option('--sin_color_pos', type=bool, default=False)
 
-@click.option('--with_regression', type=bool, default=True)
+@click.option('--with_regression', type=bool, default=False)
 
 def main(
     log_dir,
@@ -267,7 +267,7 @@ def main(
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoint_path = log_dir / 'second_checkpoint_epoch_1_iter_145000.pth'      # base
+    checkpoint_path = log_dir / 'second_checkpoint_epoch_0_iter_20000.pth'      # base
 
     dataset_kwargs = variant["dataset_kwargs"]
     val_kwargs = dataset_kwargs.copy()

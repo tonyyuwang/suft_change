@@ -239,7 +239,7 @@ def evaluate(
     fm_weight,
     log_dir=None,
     diversity_index=0,
-    with_regression=True,
+    with_regression=False,
 ):
     model_without_ddp = model
     if hasattr(model, "module"):
@@ -248,7 +248,7 @@ def evaluate(
     header = "Eval:"
     print_freq = 50
     if log_dir is not None:
-        save_dir = os.path.join(log_dir, 'images/second_checkpoint_epoch_1_iter_145000.pth')
+        save_dir = os.path.join(log_dir, 'images/second_checkpoint_epoch_0_iter_20000.pth')
         # save_dir = "/data/wy/logs/swinunetcorrect/logs/without_correct/fourth_checkpoint_epoch_0_iter_115000.pth"
         print("save_dir:", save_dir)
         if not os.path.exists(save_dir):
