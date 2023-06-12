@@ -1,9 +1,9 @@
 # CT<sup>2</sup>: Colorization Transformer via Color Tokens (official)
 
 ## Introduction
-This is the author's official PyTorch <b>CT<sup>2</sup></b> implementation.
+This is the author's official PyTorch suft_change implementation.
 
-We present <b>C</b>olorization <b>T</b>ransformer via <b>C</b>olor <b>T</b>okens (<b>CT<sup>2</sup></b>) to colorize grayish images while dealing with incorrect semantic colors and undersaturation without any additional external priors.
+We present suft_change via color tokens to colorize grayish images while dealing with incorrect semantic colors and undersaturation without any additional external priors.
 
 <!-- ![test image size](https://github.com/shuchenweng/CT2/blob/main/application.png){:height="100%" width="100%"} -->
  <img src="https://github.com/shuchenweng/CT2/blob/main/application.png" align=center />
@@ -17,7 +17,7 @@ We present <b>C</b>olorization <b>T</b>ransformer via <b>C</b>olor <b>T</b>okens
 ## Installation
 Clone this repo: 
 ```
-git clone https://github.com/shuchenweng/CT2.git
+git clone https://github.com/tonyyuwang/suft_change.git
 ```
 Install PyTorch and dependencies
 ```
@@ -25,7 +25,7 @@ http://pytorch.org
 ```
 Install other python requirements
 ```
-pip install -r requirement.txt
+pip install -r requirements.txt
 ```
 Download the pretrained vit model and move it to *segm/resources/vit_large_patch16_384.npz*
 ```
