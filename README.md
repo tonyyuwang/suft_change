@@ -1,4 +1,4 @@
-# CT<sup>2</sup>: Colorization Transformer via Color Tokens (official)
+# SUFT: Swin Unet Fine-colortuning via Color Tokens (official)
 
 ## Introduction
 This is the author's official PyTorch suft_change implementation.
